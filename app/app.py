@@ -22,6 +22,7 @@ def show_main_page():
 
     st.image(image, width=400)
     st.title(':blue[Сервис для проверки аномалий в платежах]:')
+    # st.header('Попробуй - убедись!')
 
     st.markdown("""
         <style>
@@ -82,12 +83,12 @@ def write_prediction(prediction):
 
 
 def process_side_bar_inputs():
-    data = sidebar_input_features()
-    if data is not None:
-        df = pd.DataFrame(data, index=[0])
-        write_user_data(df)
-
-    print(data)
+    st.sidebar.header('Заданные пользователем параметры:')
+    user_input_df = sidebar_input_features()
+    write_user_data(user_input_df)
+    df = open_data()
+    df = pd.concat((user_input_df, df), axis=0)
+    print('----')
     # preprocessed_df = preprocess_data(df)
     # print(preprocessed_df)
     # user_df = preprocessed_df[:1]
@@ -97,8 +98,7 @@ def process_side_bar_inputs():
 
 def sidebar_input_features():
     with st.sidebar.form(key='my_form'):
-        st.sidebar.header('Заданные пользователем параметры:')
-        st.form_submit_button(label='Отправить')
+        submit_button = st.form_submit_button(label='Отправить')
         division = st.sidebar.selectbox("Подразделение", ("Уфа"))
         num_odpu = (st.sidebar.text_input("№ ОДПУ"))
         st.sidebar.text("Период показаний")
@@ -118,38 +118,35 @@ def sidebar_input_features():
         square = st.sidebar.slider("Общая площадь объекта", min_value=0, max_value=20000, value=0, step=1)
         current_consumption = st.sidebar.slider("Текущее потребление, Гкал", min_value=0, max_value=100, value=0, step=1)
 
-        translation = {
-            "да": 1,
-            "нет": 0,
-            "январь": 1,
-            "февраль": 2,
-            "март": 3,
-            "апрель": 4,
-            "октябрь": 10,
-            "ноябрь": 11,
-            "декабрь": 12
-        }
+    translation = {
+        "да": 1,
+        "нет": 0,
+        "январь": 1,
+        "февраль": 2,
+        "март": 3,
+        "апрель": 4,
+        "октябрь": 10,
+        "ноябрь": 11,
+        "декабрь": 12
+    }
 
-        data = {
-            'division': division,
-            'num_odpu': num_odpu,
-            "month": translation[month],
-            "year": year,
-            'hot_water': translation[hot_water],
-            'address': address,
-            'object_type': object_type,
-            'floors': floors,
-            'contruction_date': contruction_date,
-            'square': square,
-            'current_consumption': current_consumption,
-        }
-        if not address:
-            st.sidebar.error("Пожалуйста, заполните все поля формы.")
-            return None
-        else:
-            st.sidebar.success('Форма успешно отправлена!')
-            print("ф")
-            return data
+    data = {
+        'division': division,
+        'num_odpu': num_odpu,
+        "month": translation[month],
+        "year": year,
+        'hot_water': translation[hot_water],
+        'address': address,
+        'object_type': object_type,
+        'floors': floors,
+        'contruction_date': contruction_date,
+        'square': square,
+        'current_consumption': current_consumption,
+    }
+
+    df = pd.DataFrame(data, index=[0])
+    print("ф")
+    return df
 
 
 if __name__ == "__main__":
