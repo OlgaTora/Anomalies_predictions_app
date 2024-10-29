@@ -33,6 +33,9 @@
 * **anom_sum** - сумма таргетов.
 * **anom** - *anom_sum* аномалия (True(1),False(0)).
 
+PERIOD ukazat testa
+PRIMERI 
+
 For check:
 division,num_odpu,hot_water,address,object_type,date,current_consumption,floors,contruction_date,square,temperature,ozp,year,month
 01329161850 г Уфа, ул. Рудольфа Нуреева, д.1 корп.1-3 11

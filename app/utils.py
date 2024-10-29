@@ -7,11 +7,11 @@ from CONST import MONTHS, DF_PATH, DATA_PATH
 def calculate_deviation(group):
     """Функция для расчета отклонения в группе и записи в новый столбец"""
     group["cons_deviation"] = (
-        abs(
-            (group["current_consumption"] - group["current_consumption"].mean())
-            / group["current_consumption"].mean()
-        )
-        * 100
+            abs(
+                (group["current_consumption"] - group["current_consumption"].mean())
+                / group["current_consumption"].mean()
+            )
+            * 100
     )
     return group
 
@@ -44,11 +44,7 @@ def get_all_data(data_dir):
 
 
 def create_sequences(data, seq_length):
-    xs, ys = [], []
-    for i in range(len(data) - seq_length):
-        x = data[i:i+seq_length, :-1]  # Исключаем последний столбец (метку аномалии)
-        y = data[i+seq_length, -1]     # Метка аномалии
-        xs.append(x)
-        ys.append(y)
-    return np.array(xs), np.array(ys)
-
+    X_test = data[:, -1]
+    X_test_padded = np.zeros((X_test.shape[0], seq_length, 33))
+    X_test_padded[:, :1, :33] = X_test
+    return X_test_padded

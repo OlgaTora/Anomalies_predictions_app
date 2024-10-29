@@ -1,14 +1,15 @@
+import numpy as np
 import pandas as pd
 from keras._tf_keras import keras
 
 from sklearn.preprocessing import RobustScaler, LabelEncoder
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
-
-from CONST import DF_PATH, WEIGHTS_PATH
+from CONST import DF_PATH, WEIGHTS_PATH, WEIGHTS_PATH_MKD
 from utils import calculate_deviation, get_all_data, create_sequences
 
 
@@ -57,6 +58,13 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     # оставляем данные только по счетчику, который проверяется
     # data_df = data_df[data_df.num_odpu == target.num_odpu]
 
+    data_df['area_deviation'] = data_df.groupby(['address', 'object_type'])['square'].pct_change()
+    if data_df['address'].nunique() > 1:
+        data_df.loc[data_df['area_deviation'].isna(), 'area_deviation'] = 0
+    data_df['area_deviation'] = data_df['area_deviation'].replace([float('inf'), -float('inf')], -1)
+
+    # округлим до сотых
+    data_df['area_deviation'] = round(data_df['area_deviation'], 2)
     # изменение потребления относительно того же месяца предшествующего периода
     data_df = data_df.sort_values(by=['address', 'num_odpu', 'year', 'month'])
     data_df['year_per_year_cons_devi'] = round(
@@ -113,9 +121,11 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     data_df['cons_dev_anom'] = data_df['cons_deviation'].apply(lambda x: 1 if x > 25 else 0)
     data_df['ypy_cons_devi_anom'] = data_df['year_per_year_cons_devi'].apply(lambda x: 1 if x > 25 else 0)
     data_df['cons_dev_anom'] = data_df['cons_dev'].apply(lambda x: 1 if x > 50 else 0)
+    data_df['area_dev_anom'] = data_df['area_deviation'].apply(lambda x: 1 if x > 10 else 0)
 
     data_df['anom_sum'] = \
-        data_df.is_same_as_previous + data_df.cons_dev_anom + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom
+        (data_df.is_same_as_previous + data_df.cons_dev_anom
+         + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom + data_df.area_dev_anom)
 
     data_df['anom'] = data_df['anom_sum'].apply(lambda x: 1 if x != 0 else 0)
     return data_df
@@ -132,15 +142,16 @@ def preprocess_data(df: pd.DataFrame):
     df = encoder_cat(df)
     # Оставим только таргет
     df = df.iloc[target.index]
-    print(df)
+    print(df.shape)
     return df, target.object_type
 
 
 def predict(test: pd.DataFrame) -> int:
     seq_length = 50  # Длина временного окна
-    X = create_sequences(test, seq_length)
-    model = keras.models.load_model(WEIGHTS_PATH)
-    y_pred = model.predict(X)
+    X = create_sequences(test.values, seq_length)
+    # X = np.array(test.values)
+    model = keras.models.load_model(WEIGHTS_PATH_MKD)
+    y_pred = round(model.predict(X)[0][0], 2)
     # Преобразуем вероятности в метки классов
-    y_pred = (y_pred > 0.5).astype(int)
+    # y_pred = (y_pred > 0.5).astype(int)
     return y_pred

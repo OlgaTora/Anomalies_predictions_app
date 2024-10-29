@@ -106,8 +106,8 @@ def sidebar():
 
 
 def display_results(data: dict, submit):
-    flag = False
     """Функция для отображения результатов ввода на главной странице."""
+    flag = False
     df = pd.DataFrame(data,  index=[0])
     st.write('## Проверьте ваши данные перед отправкой.')
     st.write(df)
@@ -139,10 +139,13 @@ def process_side_bar_inputs(data, submit):
 def write_prediction(test: pd.DataFrame):
     prediction = predict(test)
     if prediction > 0:
-        st.markdown('<p class="pretty-font">Обнаружена аномалия в данных:</p>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="pretty-font">Обнаружена аномалия в данных:</p>', unsafe_allow_html=True)
         st.header(prediction)
     else:
+        st.header(prediction)
         st.write('## Введите запрос!')
+
 
 def main():
     """Основная функция для запуска приложения."""
