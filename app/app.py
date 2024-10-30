@@ -26,9 +26,9 @@ def set_app_config():
     st.markdown(
         """
         <style>
-        .reportview-container {
-            background: white;
-        }
+        [data-testid=stAlert]{
+            background-color: #f78f1e;
+            }
         [data-testid=stSidebar] {
             background-color: #f78f1e;
             color: #FFFFFF;
@@ -111,7 +111,7 @@ def display_results(data: dict, submit: bool) -> bool:
     """Функция для отображения результатов ввода на главной странице."""
     flag = False
     df = pd.DataFrame(data, index=[0])
-    st.write('## Проверьте ваши данные перед отправкой.')
+    st.write('## :blue[Проверьте ваши данные перед отправкой.]')
     st.write(df)
     if submit:
         # print(datetime(data['year'], data['month'], 1).date())
