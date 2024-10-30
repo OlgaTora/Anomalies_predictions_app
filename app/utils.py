@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from CONST import MONTHS, DF_PATH, DATA_PATH
+from CONST import MONTHS
 
 
 def calculate_deviation(group):
@@ -16,8 +16,16 @@ def calculate_deviation(group):
     return group
 
 
-def get_temperatures(data_dir: str):
+def read_xls_file(data_dir: str) -> pd.DataFrame:
+    """Чтение xls файла"""
     df = pd.read_excel(data_dir, skiprows=1)
+
+    return df
+
+
+def transform_df_temps(data_dir: str) -> pd.DataFrame:
+    """Функция для преобразования файла температур"""
+    df = read_xls_file(data_dir)
     df.drop(columns=['Unnamed: 0'], inplace=True)
     df = df.set_index('Период').T
     df = df.reset_index()
@@ -27,18 +35,14 @@ def get_temperatures(data_dir: str):
         inplace=True,
     )
     df.temperature = round(df.temperature, 2)
+    df['month'] = df['index'].apply(lambda x: str(x.month)).astype(int)
+    df['year'] = df['index'].apply(lambda x: str(x.year)).astype(int)
+    df = df.drop(columns=['index'])
     return df
 
 
-def transform_df_temps(data_dir):
-    temps = get_temperatures(data_dir)
-    temps['month'] = temps['index'].apply(lambda x: str(x.month)).astype(int)
-    temps['year'] = temps['index'].apply(lambda x: str(x.year)).astype(int)
-    temps = temps.drop(columns=['index'])
-    return temps
-
-
-def get_all_data(data_dir):
+def read_csv_file(data_dir: str) -> pd.DataFrame:
+    """Чтение csv файла"""
     df = pd.read_csv(data_dir)
     return df
 

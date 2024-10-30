@@ -3,32 +3,32 @@ import pandas as pd
 from keras._tf_keras import keras
 
 from sklearn.preprocessing import RobustScaler, LabelEncoder
-import os
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-import tensorflow as tf
 from tensorflow.keras.models import load_model
 
 from CONST import DF_PATH, WEIGHTS_PATH, WEIGHTS_PATH_MKD
-from utils import calculate_deviation, get_all_data, create_sequences
+from utils import calculate_deviation, read_xls_file, create_sequences, read_csv_file
 
 
-def encoder_cat(data_normalized: pd.DataFrame) -> pd.DataFrame:
-    categorical_features = (data_normalized
+def encoder_cat(data: pd.DataFrame) -> pd.DataFrame:
+    """Кодировние категориальных признаков, нормализация данных"""
+    categorical_features = (data
                             .select_dtypes(include=['object', 'category']).columns.tolist())
     label_encoders = {feature: LabelEncoder() for feature in categorical_features}
 
     for feature, le in label_encoders.items():
-        data_normalized[feature] = le.fit_transform(data_normalized[feature])
+        data[feature] = le.fit_transform(data[feature])
 
     scaler = RobustScaler()
-    data_normalized = pd.DataFrame(
-        scaler.fit_transform(data_normalized), columns=data_normalized.columns)
-    return data_normalized
+    data = pd.DataFrame(
+        scaler.fit_transform(data), columns=data.columns)
+    return data
 
 
 def preprocess_input_data(data_df: pd.DataFrame) -> pd.DataFrame:
+    """Препроцессинг введенных данных: преобразование типов, заполнение пропусков"""
     data_df['current_consumption'] = data_df['current_consumption'].astype(float)
+    data_df['square'] = data_df['square'].astype(float)
+
     # Если нет данных
     data_df['square'].replace(0, -1)
     data_df['contruction_date'].replace(0, -1)
@@ -37,7 +37,8 @@ def preprocess_input_data(data_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
-    target = data_df.iloc[0]
+    """Генерация признаков для модели"""
+    # target = data_df.iloc[0]
     # группировка по этажности и дате постройки
     data_df['const_date_group'] = pd.cut(data_df['contruction_date'],
                                          bins=[-1, 0, 1958, 1989, 2000, 2010, 2024],
@@ -62,8 +63,6 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     if data_df['address'].nunique() > 1:
         data_df.loc[data_df['area_deviation'].isna(), 'area_deviation'] = 0
     data_df['area_deviation'] = data_df['area_deviation'].replace([float('inf'), -float('inf')], -1)
-
-    # округлим до сотых
     data_df['area_deviation'] = round(data_df['area_deviation'], 2)
     # изменение потребления относительно того же месяца предшествующего периода
     data_df = data_df.sort_values(by=['address', 'num_odpu', 'year', 'month'])
@@ -102,7 +101,7 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
             (data_df['temperature'] - data_df['prev_temperature']) / data_df['prev_temperature'])
     data_df['temperature_diff'] = data_df['temperature_diff'].replace([float('inf'), -float('inf')], 0)
     data_df.drop('prev_temperature', axis=1, inplace=True)
-    data_df.temperature_diff.fillna(0, inplace=True)
+    data_df.temperature_diff = data_df.temperature_diff.fillna(0)
     # произведение потребления Гкал и температуры
     data_df['consumption_times_temperature'] = data_df['current_consumption'] * data_df['temperature']
     # consumption_minus_temperature
@@ -132,10 +131,15 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def preprocess_data(df: pd.DataFrame):
+    """
+    Подготовка данных к тестированию (делается на всем массиве, так как нужны исторические
+    данные для выявления аномалий.
+    Возращает только строку с таргетом.
+    """
     target = preprocess_input_data(df)
     target_date = target.iloc[0].date
     target_consumption = target.iloc[0].current_consumption
-    all_data = get_all_data(DF_PATH)
+    all_data = read_csv_file(DF_PATH)
     df = pd.concat((target, all_data), ignore_index=True)
     df = generate_new_features(df)
     target = df[(df.current_consumption == target_consumption) & (df.date == target_date)]
@@ -147,11 +151,12 @@ def preprocess_data(df: pd.DataFrame):
 
 
 def predict(test: pd.DataFrame) -> int:
+    """Получение предсказания"""
     seq_length = 50  # Длина временного окна
     X = create_sequences(test.values, seq_length)
     # X = np.array(test.values)
     model = keras.models.load_model(WEIGHTS_PATH_MKD)
-    y_pred = round(model.predict(X)[0][0], 2)
+    y_pred = model.predict(X)#[0][0]
     # Преобразуем вероятности в метки классов
     # y_pred = (y_pred > 0.5).astype(int)
     return y_pred

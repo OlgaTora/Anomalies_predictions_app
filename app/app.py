@@ -4,7 +4,7 @@ from PIL import Image
 
 from CONST import DATA_PATH
 from model import preprocess_data, predict
-from utils import get_temperatures, transform_df_temps
+from utils import transform_df_temps
 from data_translation import translation
 
 
@@ -67,7 +67,7 @@ def set_app_config():
     """, unsafe_allow_html=True)
 
 
-def sidebar():
+def sidebar() -> tuple[dict, bool]:
     """Функция для обработки боковой панели ввода."""
     st.sidebar.header('Заданные пользователем параметры:')
     division = st.sidebar.selectbox("Подразделение", ("Уфа"))
@@ -86,7 +86,7 @@ def sidebar():
                                                     "Нежилой дом", "Пожарное депо", "Гаражи"))
     floors = st.sidebar.slider('Этажность объекта', min_value=1, max_value=100, value=1, step=1)
     contruction_date = st.sidebar.text_input('Дата постройки', value='0')
-    square = st.sidebar.slider('Общая площадь объекта', min_value=0, max_value=20000, step=1)
+    square = st.sidebar.text_input('Общая площадь объекта')
     current_consumption = st.sidebar.text_input('Текущее потребление, Гкал')
     submit = st.sidebar.button('Отправить')
     data = {
@@ -105,7 +105,7 @@ def sidebar():
     return data, submit
 
 
-def display_results(data: dict, submit):
+def display_results(data: dict, submit: bool) -> bool:
     """Функция для отображения результатов ввода на главной странице."""
     flag = False
     df = pd.DataFrame(data,  index=[0])
@@ -126,7 +126,8 @@ def display_results(data: dict, submit):
     return flag
 
 
-def process_side_bar_inputs(data, submit):
+def process_side_bar_inputs(data: dict, submit: bool):
+    """Объединяет полученные от пользователя данные и температуры, вызывает функцию препроцессинга"""
     flag = display_results(data, submit)
     if flag:
         temps = transform_df_temps(DATA_PATH)
@@ -137,6 +138,7 @@ def process_side_bar_inputs(data, submit):
 
 
 def write_prediction(test: pd.DataFrame):
+    """Функция для вывода результатов предсказания на экран, вызывает функцию расчета предсказания"""
     prediction = predict(test)
     if prediction > 0:
         st.markdown(
