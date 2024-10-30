@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from keras._tf_keras import keras
 
@@ -59,11 +58,11 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     # оставляем данные только по счетчику, который проверяется
     # data_df = data_df[data_df.num_odpu == target.num_odpu]
 
-    data_df['area_deviation'] = data_df.groupby(['address', 'object_type'])['square'].pct_change()
-    if data_df['address'].nunique() > 1:
-        data_df.loc[data_df['area_deviation'].isna(), 'area_deviation'] = 0
-    data_df['area_deviation'] = data_df['area_deviation'].replace([float('inf'), -float('inf')], -1)
-    data_df['area_deviation'] = round(data_df['area_deviation'], 2)
+    # data_df['area_deviation'] = data_df.groupby(['address', 'object_type'])['square'].pct_change()
+    # if data_df['address'].nunique() > 1:
+    #     data_df.loc[data_df['area_deviation'].isna(), 'area_deviation'] = 0
+    # data_df['area_deviation'] = data_df['area_deviation'].replace([float('inf'), -float('inf')], -1)
+    # data_df['area_deviation'] = round(data_df['area_deviation'], 2)
     # изменение потребления относительно того же месяца предшествующего периода
     data_df = data_df.sort_values(by=['address', 'num_odpu', 'year', 'month'])
     data_df['year_per_year_cons_devi'] = round(
@@ -104,28 +103,21 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     data_df.temperature_diff = data_df.temperature_diff.fillna(0)
     # произведение потребления Гкал и температуры
     data_df['consumption_times_temperature'] = data_df['current_consumption'] * data_df['temperature']
-    # consumption_minus_temperature
+    # разница между потреблением Гкал и температурой
     data_df['consumption_minus_temperature'] = data_df['current_consumption'] - data_df['temperature']
-    new_cols = (
-        data_df["address"]
-        .str.split(", ", expand=True)
-        .rename(columns={0: "city", 1: "street", 2: "house", 3: "building"})
-    )
-    new_cols = new_cols.drop(columns=["house", "building"], axis=1, errors='ignore')
-    data_df = data_df.join(new_cols)
-
-    data_df.insert(3, 'city', data_df.pop('city'))
-    data_df.insert(4, 'street', data_df.pop('street'))
-
+    # выделение улицы и города
+    data_df[['city', 'street', 'house', 'building']] = data_df['address'].str.split(', ', expand=True)
+    data_df = data_df.drop(columns=["house", "building"], axis=1)#, errors='ignore')
+    data_df.insert(6, 'city', data_df.pop('city'))
+    data_df.insert(7, 'street', data_df.pop('street'))
+    # таргеты
     data_df['cons_dev_anom'] = data_df['cons_deviation'].apply(lambda x: 1 if x > 25 else 0)
     data_df['ypy_cons_devi_anom'] = data_df['year_per_year_cons_devi'].apply(lambda x: 1 if x > 25 else 0)
     data_df['cons_dev_anom'] = data_df['cons_dev'].apply(lambda x: 1 if x > 50 else 0)
-    data_df['area_dev_anom'] = data_df['area_deviation'].apply(lambda x: 1 if x > 10 else 0)
-
+    # data_df['area_dev_anom'] = data_df['area_deviation'].apply(lambda x: 1 if x > 10 else 0)
     data_df['anom_sum'] = \
         (data_df.is_same_as_previous + data_df.cons_dev_anom
-         + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom + data_df.area_dev_anom)
-
+         + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom)# + data_df.area_dev_anom)
     data_df['anom'] = data_df['anom_sum'].apply(lambda x: 1 if x != 0 else 0)
     return data_df
 
@@ -142,20 +134,22 @@ def preprocess_data(df: pd.DataFrame):
     all_data = read_csv_file(DF_PATH)
     df = pd.concat((target, all_data), ignore_index=True)
     df = generate_new_features(df)
+    # print(target.index)
     target = df[(df.current_consumption == target_consumption) & (df.date == target_date)]
     df = encoder_cat(df)
     # Оставим только таргет
     df = df.iloc[target.index]
-    print(df.shape)
-    return df, target.object_type
+    return df, target.object_type.to_list()
 
 
-def predict(test: pd.DataFrame) -> int:
+def predict(test: pd.DataFrame, mkd: bool) -> int:
     """Получение предсказания"""
     seq_length = 50  # Длина временного окна
     X = create_sequences(test.values, seq_length)
-    # X = np.array(test.values)
-    model = keras.models.load_model(WEIGHTS_PATH_MKD)
+    if mkd:
+        model = keras.models.load_model(WEIGHTS_PATH_MKD)
+    else:
+        model = keras.models.load_model(WEIGHTS_PATH)
     y_pred = model.predict(X)#[0][0]
     # Преобразуем вероятности в метки классов
     # y_pred = (y_pred > 0.5).astype(int)

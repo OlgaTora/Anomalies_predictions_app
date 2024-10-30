@@ -52,3 +52,4 @@ def create_sequences(data, seq_length):
     X_test_padded = np.zeros((X_test.shape[0], seq_length, 33))
     X_test_padded[:, :1, :33] = X_test
     return X_test_padded
+

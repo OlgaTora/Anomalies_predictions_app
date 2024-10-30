@@ -1,8 +1,10 @@
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 from PIL import Image
 
-from CONST import DATA_PATH
+from CONST import DATA_PATH, START_DATE, END_DATE
 from model import preprocess_data, predict
 from utils import transform_df_temps
 from data_translation import translation
@@ -79,13 +81,13 @@ def sidebar() -> tuple[dict, bool]:
     hot_water = st.sidebar.selectbox("ГВС", ("да", "нет"))
     address = st.sidebar.text_input("Адрес объекта")
     object_type = st.sidebar.selectbox("Тип объекта", ("Другое строение", "Дет.ясли и сады",
-                                                    "Многоквартирный дом",
-                                                    "Административные здания, конторы",
-                                                    "Школы и ВУЗ", "Магазины",
-                                                    "Спортзалы, крытые стадионы и другие спортивные сооружения",
-                                                    "Нежилой дом", "Пожарное депо", "Гаражи"))
+                                                       "Многоквартирный дом",
+                                                       "Административные здания, конторы",
+                                                       "Школы и ВУЗ", "Магазины",
+                                                       "Спортзалы, крытые стадионы и другие спортивные сооружения",
+                                                       "Нежилой дом", "Пожарное депо", "Гаражи"))
     floors = st.sidebar.slider('Этажность объекта', min_value=1, max_value=100, value=1, step=1)
-    contruction_date = st.sidebar.text_input('Дата постройки', value='0')
+    contruction_date = st.sidebar.text_input('Дата постройки', value='0', max_chars=4)
     square = st.sidebar.text_input('Общая площадь объекта')
     current_consumption = st.sidebar.text_input('Текущее потребление, Гкал')
     submit = st.sidebar.button('Отправить')
@@ -108,10 +110,11 @@ def sidebar() -> tuple[dict, bool]:
 def display_results(data: dict, submit: bool) -> bool:
     """Функция для отображения результатов ввода на главной странице."""
     flag = False
-    df = pd.DataFrame(data,  index=[0])
+    df = pd.DataFrame(data, index=[0])
     st.write('## Проверьте ваши данные перед отправкой.')
     st.write(df)
     if submit:
+        # print(datetime(data['year'], data['month'], 1).date())
         if data['num_odpu'] == "":
             st.error('Пожалуйста, введите номер ОДПУ.')
         elif data['address'] == '':
@@ -120,6 +123,11 @@ def display_results(data: dict, submit: bool) -> bool:
             st.error('Пожалуйста, введите год.')
         elif data['current_consumption'] == '':
             st.error('Пожалуйста, введите сумму ГКал.')
+        elif ((datetime.strptime(START_DATE, "%Y-%m-%d")
+              > datetime(data['year'], data['month'], 1)
+                or (datetime(data['year'], data['month'], 1)
+                    > datetime.strptime(END_DATE, "%Y-%m-%d")))):
+            st.error(f'Дата ограничена данными: от {START_DATE} до {END_DATE}')
         else:
             st.success('Данные успешно отправлены.')
             flag = True
@@ -134,12 +142,15 @@ def process_side_bar_inputs(data: dict, submit: bool):
         df = pd.DataFrame(data, index=[0])
         df = df.merge(temps, on=['month', 'year'])
         df, object_type = preprocess_data(df)
-        write_prediction(df)
+        if object_type == 'Многоквартирный дом':
+            write_prediction(df, True)
+        else:
+            write_prediction(df, False)
 
 
-def write_prediction(test: pd.DataFrame):
+def write_prediction(test: pd.DataFrame, mkd: bool):
     """Функция для вывода результатов предсказания на экран, вызывает функцию расчета предсказания"""
-    prediction = predict(test)
+    prediction = predict(test, mkd)
     if prediction > 0:
         st.markdown(
             '<p class="pretty-font">Обнаружена аномалия в данных:</p>', unsafe_allow_html=True)
