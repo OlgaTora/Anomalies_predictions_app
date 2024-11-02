@@ -34,7 +34,16 @@ def transform_df_temps(data_dir: str) -> pd.DataFrame:
         columns={"Тн.в, град.С": "temperature", "Продолжительность ОЗП, сут.": "ozp"},
         inplace=True,
     )
-    df.temperature = round(df.temperature, 2)
+    df['temp_K'] = df['temperature'] + 273.15
+    df = df.sort_values(by=['index'])
+    df['prev_temp_K'] = df['temp_K'].shift(1)
+    df['temp_change_K'] = (df['temp_K'] - df['prev_temp_K']) / df['prev_temp_K']
+
+    df.temperature = round(df.temperature, 6)
+    df.temp_change_K = round(df.temperature, 6)
+    df.prev_temp_K = round(df.temperature, 6)
+    df.temp_K = round(df.temperature, 6)
+
     df['month'] = df['index'].apply(lambda x: str(x.month)).astype(int)
     df['year'] = df['index'].apply(lambda x: str(x.year)).astype(int)
     df = df.drop(columns=['index'])

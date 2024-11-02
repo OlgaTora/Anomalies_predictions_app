@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from keras._tf_keras import keras
 
@@ -37,7 +38,6 @@ def preprocess_input_data(data_df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     """Генерация признаков для модели"""
-    # target = data_df.iloc[0]
     # группировка по этажности и дате постройки
     data_df['const_date_group'] = pd.cut(data_df['contruction_date'],
                                          bins=[-1, 0, 1958, 1989, 2000, 2010, 2024],
@@ -55,14 +55,7 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
     data_df.cons_deviation = round(data_df.cons_deviation, 0)
-    # оставляем данные только по счетчику, который проверяется
-    # data_df = data_df[data_df.num_odpu == target.num_odpu]
 
-    # data_df['area_deviation'] = data_df.groupby(['address', 'object_type'])['square'].pct_change()
-    # if data_df['address'].nunique() > 1:
-    #     data_df.loc[data_df['area_deviation'].isna(), 'area_deviation'] = 0
-    # data_df['area_deviation'] = data_df['area_deviation'].replace([float('inf'), -float('inf')], -1)
-    # data_df['area_deviation'] = round(data_df['area_deviation'], 2)
     # изменение потребления относительно того же месяца предшествующего периода
     data_df = data_df.sort_values(by=['address', 'num_odpu', 'year', 'month'])
     data_df['year_per_year_cons_devi'] = round(
@@ -108,17 +101,28 @@ def generate_new_features(data_df: pd.DataFrame) -> pd.DataFrame:
     # выделение улицы и города
     data_df[['city', 'street', 'house', 'building']] = data_df['address'].str.split(', ', expand=True)
     data_df = data_df.drop(columns=["house", "building"], axis=1)#, errors='ignore')
-    data_df.insert(6, 'city', data_df.pop('city'))
-    data_df.insert(7, 'street', data_df.pop('street'))
+    data_df = data_df.drop('address', axis=1)
     # таргеты
     data_df['cons_dev_anom'] = data_df['cons_deviation'].apply(lambda x: 1 if x > 25 else 0)
     data_df['ypy_cons_devi_anom'] = data_df['year_per_year_cons_devi'].apply(lambda x: 1 if x > 25 else 0)
     data_df['cons_dev_anom'] = data_df['cons_dev'].apply(lambda x: 1 if x > 50 else 0)
-    # data_df['area_dev_anom'] = data_df['area_deviation'].apply(lambda x: 1 if x > 10 else 0)
     data_df['anom_sum'] = \
         (data_df.is_same_as_previous + data_df.cons_dev_anom
-         + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom)# + data_df.area_dev_anom)
-    data_df['anom'] = data_df['anom_sum'].apply(lambda x: 1 if x != 0 else 0)
+         + data_df.ypy_cons_devi_anom + data_df.cons_dev_anom)
+
+    data_df.insert(5, 'city', data_df.pop('city'))
+    data_df.insert(6, 'street', data_df.pop('street'))
+    data_df.insert(8, 'date', data_df.pop('date'))
+    data_df.insert(9, 'current_consumption', data_df.pop('current_consumption'))
+    data_df.insert(10, 'floors', data_df.pop('floors'))
+
+    data_df.insert(17, 'month', data_df.pop('month'))
+    data_df.insert(16, 'year', data_df.pop('year'))
+    data_df.insert(23, 'cons_per_deg', data_df.pop('cons_per_deg'))
+    data_df.insert(24, 'temp_coef', data_df.pop('temp_coef'))
+    data_df.insert(25, 'avg_cons', data_df.pop('avg_cons'))
+    data_df.insert(26, 'cons_dev', data_df.pop('cons_dev'))
+    data_df.insert(27, 'consumption_diff', data_df.pop('consumption_diff'))
     return data_df
 
 
@@ -129,21 +133,49 @@ def preprocess_data(df: pd.DataFrame):
     Возращает только строку с таргетом.
     """
     target = preprocess_input_data(df)
+    print(target.current_consumption)
     target_date = target.iloc[0].date
     target_consumption = target.iloc[0].current_consumption
+    num_odpu = target.iloc[0].num_odpu
     all_data = read_csv_file(DF_PATH)
     df = pd.concat((target, all_data), ignore_index=True)
     df = generate_new_features(df)
-    # print(target.index)
-    target = df[(df.current_consumption == target_consumption) & (df.date == target_date)]
+    target = df[(df.num_odpu == num_odpu) & (df.date == target_date) & (df.current_consumption == target_consumption)]
+    print(df.loc[target.index])
     df = encoder_cat(df)
     # Оставим только таргет
-    df = df.iloc[target.index]
+    df = df.loc[target.index]
+    df = df.fillna(0)
     return df, target.object_type.to_list()
+
+
+def generate_new_features_1(data_df):
+    data_df = data_df.sort_values(by=['num_odpu', 'address', 'date'])
+    data_df['zero_consumption'] = (data_df.current_consumption == 0) & (data_df.hot_water != 1)
+    data_df['prev_months_change'] = (data_df.groupby(['num_odpu', 'address', 'year'])[
+                                         'current_consumption'].pct_change() == 0) | \
+                                    (data_df.groupby(['num_odpu', 'address', 'year'])['current_consumption'].pct_change(
+                                        2) == 0)
+    data_df['coef_per_day'] = round(data_df.current_consumption / data_df.ozp / data_df.temp_K, 6)
+    data_df['prev_coef_per_day'] = data_df.groupby(['num_odpu', 'address'])['coef_per_day'].shift(1)
+    data_df['consumption_change_per_day'] = (
+        data_df.groupby(['num_odpu', 'address'])['coef_per_day'].pct_change())  # > 0.25
+    data_df.consumption_change_per_day = data_df.consumption_change_per_day.fillna(0)
+    data_df.consumption_change_per_day = data_df.consumption_change_per_day.replace([float('inf'), -float('inf')], 0)
+
+    data_df.insert(16, 'month', data_df.pop('month'))
+    data_df.insert(5, 'object_type', data_df.pop('object_type'))
+
+    data_df.insert(6, 'date', data_df.pop('date'))
+    data_df.insert(7, 'current_consumption', data_df.pop('current_consumption'))
+    data_df.insert(15, 'year', data_df.pop('year'))
+    return data_df
 
 
 def predict(test: pd.DataFrame, mkd: bool) -> int:
     """Получение предсказания"""
+    print(test.current_consumption)
+
     seq_length = 50  # Длина временного окна
     X = create_sequences(test.values, seq_length)
     if mkd:
@@ -154,3 +186,16 @@ def predict(test: pd.DataFrame, mkd: bool) -> int:
     # Преобразуем вероятности в метки классов
     # y_pred = (y_pred > 0.5).astype(int)
     return y_pred
+    # import pickle
+    # print(test.current_consumption)
+    # with open('app/models/data.pickle', "rb") as openfile:
+    #     while True:
+    #         try:
+    #             model = pickle.load(openfile)
+    #             y_pred = model.predict(test)
+    #             print(model.predict_proba(test))
+    #             # y_pred = model.predict_proba(test)[:, 1]
+    #         except EOFError:
+    #             break
+    # return y_pred
+

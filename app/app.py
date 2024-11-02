@@ -86,7 +86,7 @@ def sidebar() -> tuple[dict, bool]:
                                                        "Школы и ВУЗ", "Магазины",
                                                        "Спортзалы, крытые стадионы и другие спортивные сооружения",
                                                        "Нежилой дом", "Пожарное депо", "Гаражи"))
-    floors = st.sidebar.slider('Этажность объекта', min_value=1, max_value=100, value=1, step=1)
+    floors = st.sidebar.slider('Этажность объекта', min_value=1, max_value=40, value=1, step=1)
     contruction_date = st.sidebar.text_input('Дата постройки', value='0', max_chars=4)
     square = st.sidebar.text_input('Общая площадь объекта')
     current_consumption = st.sidebar.text_input('Текущее потребление, Гкал')
@@ -114,7 +114,6 @@ def display_results(data: dict, submit: bool) -> bool:
     st.write('## :blue[Проверьте ваши данные перед отправкой.]')
     st.write(df)
     if submit:
-        # print(datetime(data['year'], data['month'], 1).date())
         if data['num_odpu'] == "":
             st.error('Пожалуйста, введите номер ОДПУ.')
         elif data['address'] == '':
@@ -151,6 +150,7 @@ def process_side_bar_inputs(data: dict, submit: bool):
 def write_prediction(test: pd.DataFrame, mkd: bool):
     """Функция для вывода результатов предсказания на экран, вызывает функцию расчета предсказания"""
     prediction = predict(test, mkd)
+    # st.header(prediction)
     if prediction > 0:
         st.markdown(
             '<p class="pretty-font">Обнаружена аномалия в данных:</p>', unsafe_allow_html=True)
