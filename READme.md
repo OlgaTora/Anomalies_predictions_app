@@ -41,6 +41,7 @@
 - num_odpu,hot_water,address,object_type,date,current_consumption,floors,contruction_date,square
 - 264181,0,"г Уфа, ул. Адмирала Макарова, д.16",Многоквартирный дом,2021-12-01,91.726,10,1995,6184.12
 - 1004176, 1, г Уфа, пр-кт Октября, д.158 Многоквартирный дом,2021-12-01,316.692,9,1970,13077.9
+- 45360 г Уфа, ул. Коммунаров, д.58 2023-03-01 00:00:00 83.715 5 1970 2960 
 3. Тест ограничен регионом г.Уфа и данными, представленными заказчиком.
 4. Обработанный файл находится в папке data/df.csv, его обработка и сохранение\
 происходит в файле FInal.ipynb.
@@ -50,26 +51,6 @@ streamlit run app/app.py
 ```
 6. Необходимые для работы зависимости в файле requirements.txt
 
-  0   division                    51683 non-null  float64
- 1   num_odpu                    51683 non-null  float64
- 2   hot_water                   51683 non-null  float64
- 3   address                     51683 non-null  float64
- 4   object_type                 51683 non-null  float64
- 5   date                        51683 non-null  float64
- 6   current_consumption         51683 non-null  float64
- 7   floors                      51683 non-null  float64
- 8   contruction_date            51683 non-null  float64
- 9   square                      51683 non-null  float64
- 10  temperature                 51683 non-null  float64
- 11  ozp                         51683 non-null  float64
- 12  temp_K                      51683 non-null  float64
- 13  prev_temp_K                 51683 non-null  float64
- 14  temp_change_K               51683 non-null  float64
- 15  year                        51683 non-null  float64
- 16  month                       51683 non-null  float64
- 17  zero_consumption            51683 non-null  float64
- 18  prev_months_change          51683 non-null  float64
- 19  coef_per_day                51683 non-null  float64
- 20  prev_coef_per_day           51683 non-null  float64
- 21  consumption_change_per_day  51683 non-null  float64
- 22  anom_3                  
+
+
+ 

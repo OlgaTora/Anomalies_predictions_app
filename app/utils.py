@@ -29,20 +29,14 @@ def transform_df_temps(data_dir: str) -> pd.DataFrame:
     df.drop(columns=['Unnamed: 0'], inplace=True)
     df = df.set_index('Период').T
     df = df.reset_index()
-    df = df[~df['index'].dt.month.isin(MONTHS)]
+    # df = df[~df['index'].dt.month.isin(MONTHS)]
     df.rename(
         columns={"Тн.в, град.С": "temperature", "Продолжительность ОЗП, сут.": "ozp"},
         inplace=True,
     )
     df['temp_K'] = df['temperature'] + 273.15
-    df = df.sort_values(by=['index'])
-    df['prev_temp_K'] = df['temp_K'].shift(1)
-    df['temp_change_K'] = (df['temp_K'] - df['prev_temp_K']) / df['prev_temp_K']
-
     df.temperature = round(df.temperature, 6)
-    df.temp_change_K = round(df.temperature, 6)
-    df.prev_temp_K = round(df.temperature, 6)
-    df.temp_K = round(df.temperature, 6)
+    df.temp_K = round(df.temp_K, 6)
 
     df['month'] = df['index'].apply(lambda x: str(x.month)).astype(int)
     df['year'] = df['index'].apply(lambda x: str(x.year)).astype(int)
@@ -57,8 +51,36 @@ def read_csv_file(data_dir: str) -> pd.DataFrame:
 
 
 def create_sequences(data, seq_length):
-    X_test = data[:, -1]
-    X_test_padded = np.zeros((X_test.shape[0], seq_length, 33))
-    X_test_padded[:, :1, :33] = X_test
-    return X_test_padded
+    X_test_padded = data.loc[data.index.repeat(seq_length * 2)].reset_index(drop=True)
+    xx = X_test_padded.values
+    xs = []
+    for i in range(len(xx) - seq_length):
+        x = xx[i:i + seq_length, :]
+        xs.append(x)
+    return np.array(xs)
 
+
+def group_year(year):
+    if year <= 1958:
+        return 'до 1958 г.'
+    elif 1959 <= year <= 1989:
+        return '1959-1989 гг.'
+    elif 1990 <= year <= 2000:
+        return '1990-2000 гг.'
+    elif 2001 <= year <= 2010:
+        return '2001-2010 гг.'
+    else:
+        return '2011-2024 гг.'
+
+
+def group_floors(floors):
+    if floors in range(1, 3):
+        return '1-2 этажа'
+    elif floors in range(3, 5):
+        return '3-4 этажа'
+    elif floors in range(5, 10):
+        return '5-9 этажей'
+    elif floors in range(10, 13):
+        return '10-12 этажей'
+    else:
+        return '13 и более этажей'
