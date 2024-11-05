@@ -101,7 +101,7 @@ def process_file(file):
                 'current_consumption']
             df_ = df_.loc[:, columns_to_keep]
             df_ = df_[df_.hot_water != 'ГВС (централ)']
-            df_ = df_.dropna(subset=['date', 'current_consumption'])
+            df_ = df_.dropna(subset=['date', 'current_consumption'])  # ?
             df_info = read_csv_file(DATA_OBJECTS_PATH)
             df_ = pd.merge(df_, df_info, how="left", on=['address', 'object_type'])
             df_.date = pd.to_datetime(df_.date)
@@ -110,13 +110,19 @@ def process_file(file):
             df_.date = df_.date.dt.date
             df_.hot_water = df_.hot_water.fillna(0)
             df_.hot_water = df_.hot_water.replace('ГВС-ИТП', 1)
+            df_.contruction_date = pd.to_numeric(
+                df_.contruction_date.astype(str).str[:4], errors="coerce", downcast="integer"
+            )
             df_ = df_.fillna(0)
             for index in df_.index:
                 row_df = df_.loc[[index]]
                 anomaly, reason, consumption = process_data_inputs(row_df)
                 if anomaly:
-                    st.write(anomaly)
-                    # df.loc[index].anomaly = anomaly
+                    # st.write(row_df)
+                    # st.write(anomaly, reason)
+                    df.loc[index, 'anomaly'] = anomaly
+            df.to_csv('submit.csv')
+            st.write('Ready')
         except Exception as e:
             st.error(f"Произошла ошибка при обработке файла: {e}")
 
@@ -186,13 +192,21 @@ def display_results(data: dict, submit: bool) -> bool:
 
 
 def to_dataframe(data: dict) -> pd.DataFrame:
+    """
+    Возвращает датафрейм из словаря.
+    """
     return pd.DataFrame(data, index=[0])
 
 
 def process_data_inputs(data: pd.DataFrame) -> tuple:
-    """Объединяет полученные от пользователя данные и температуры"""
+    """
+    Объединяет полученные от пользователя данные и температуры.
+    Вызывает функции расчета предсказания.
+    Возвращает аномалию (булево), причину и показания.
+    """
     anomaly = False
     consumption = None
+
     temps = transform_df_temps(DATA_TEMP_PATH)
     df = data.merge(temps, on=['month', 'year'])
     anomaly_check, reason = check_anomalies(df)
@@ -211,7 +225,7 @@ def process_data_inputs(data: pd.DataFrame) -> tuple:
 
 
 def write_prediction(prediction: bool, reason: str = None, consumption=None):
-    """Функция для вывода результатов предсказания на экран, вызывает функцию расчета предсказания"""
+    """Функция для вывода результатов предсказания на экран"""
     if prediction:
         st.markdown(
             '<p class="pretty-font">Обнаружена аномалия в данных:</p>', unsafe_allow_html=True)

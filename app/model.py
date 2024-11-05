@@ -1,3 +1,4 @@
+from datetime import datetime
 import numpy as np
 import pandas as pd
 
@@ -5,7 +6,7 @@ import pandas as pd
 # from sklearn.preprocessing import RobustScaler, LabelEncoder
 # from tensorflow.keras.models import load_model
 
-from CONST import DF_PATH
+from CONST import DF_PATH, START_DATE
 from utils import read_csv_file, group_floors, group_year
 
 
@@ -14,9 +15,6 @@ def preprocess_input_data(data_df: pd.DataFrame) -> pd.DataFrame:
     data_df['current_consumption'] = data_df['current_consumption'].astype(float)
     # Если нет данных
     data_df = data_df.fillna(0)
-    # data_df['square'].fillna(-1)
-    # data_df['floors'].fillna(-1)
-    # data_df['contruction_date'].fillna(-1)
     data_df['date'] = pd.to_datetime(data_df[['year', 'month']].assign(day=1)).dt.strftime('%Y-%m-%d')
     return data_df
 
@@ -44,7 +42,9 @@ def concat_data(df: pd.DataFrame):
 
 
 def check_simple_anomalies(target: pd.DataFrame) -> bool:
-    if (float(target.iloc[0].current_consumption) == 0) & (int(target.iloc[0].hot_water) != 1):
+    if target.iloc[0].current_consumption is None:
+        return True
+    elif (float(target.iloc[0].current_consumption) == 0) & (int(target.iloc[0].hot_water) != 1):
         return True
 
 
@@ -55,15 +55,17 @@ def check_same_values(df: pd.DataFrame) -> bool:
 
 def check_anomalies_same_odpu(df: pd.DataFrame) -> bool:
     df['coef_per_day'] = round(df.current_consumption / df.ozp / df.temp_K, 6)
+    df.coef_per_day = df.coef_per_day.replace([float('inf'), -float('inf')], 0)
     df['prev_coef_per_day'] = df['coef_per_day'].shift(1)
     df['consumption_change_per_day'] = df['coef_per_day'].pct_change(fill_method=None)
     df.consumption_change_per_day = df.consumption_change_per_day.fillna(0)
-    # data_df.consumption_change_per_day = data_df.consumption_change_per_day.replace([float('inf'), -float('inf')], 0)
+    df.consumption_change_per_day = df.consumption_change_per_day.replace([float('inf'), -float('inf')], 0)
     q1 = df['consumption_change_per_day'].quantile(0.25)
     q3 = df['consumption_change_per_day'].quantile(0.75)
     iqr = q3 - q1
     df['anom'] = np.where((df['consumption_change_per_day'] > q1 - iqr * 1.5) \
                           & (df['consumption_change_per_day'] < q3 + iqr * 1.5), False, True)
+    # print(df)
     return df.loc[0].anom == 1
 
 
@@ -85,21 +87,21 @@ def check_anomalies_mkd(data: pd.DataFrame):
 def check_anomalies(data: pd.DataFrame):
     msg = ''
     flag = False
-    df, target = concat_data(data)
-    condition = (df.num_odpu == target.iloc[0].num_odpu)
-    df = df[condition]
-    df = df.sort_values(by='date')
-    if check_simple_anomalies(data):
-        msg = 'Нулевые показания'
-        flag = True
-    elif check_same_values(df):
-        msg = 'Одинаковые показания за прошлые периоды'
-        flag = True
-    elif check_anomalies_same_odpu(df):
-        msg = 'Аномальные показания в сравнении с прошлыми периодами'
-        flag = True
+    if datetime(data.iloc[0].year, data.iloc[0].month, 1)\
+            >= datetime.strptime(START_DATE, "%Y-%m-%d"):
+        df, target = concat_data(data)
+        condition = (df.num_odpu == target.iloc[0].num_odpu)
+        df = df[condition]
+        if df.shape[0] > 1:
+            df = df.sort_values(by='date')
+            if check_simple_anomalies(data):
+                msg = 'Нулевые показания'
+                flag = True
+            elif check_same_values(df):
+                msg = 'Одинаковые показания за прошлые периоды'
+                flag = True
+            elif check_anomalies_same_odpu(df):
+                msg = 'Аномальные показания в сравнении с прошлыми периодами'
+                flag = True
     return flag, msg
-
-
-
 
