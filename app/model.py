@@ -2,19 +2,15 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-# from keras._tf_keras import keras
-# from sklearn.preprocessing import RobustScaler, LabelEncoder
-# from tensorflow.keras.models import load_model
-
 from CONST import DF_PATH, START_DATE
 from utils import read_csv_file, group_floors, group_year
 
 
 def preprocess_input_data(data_df: pd.DataFrame) -> pd.DataFrame:
     """Препроцессинг введенных данных: преобразование типов, заполнение пропусков"""
+    data_df = data_df.fillna(0)
     data_df['current_consumption'] = data_df['current_consumption'].astype(float)
     # Если нет данных
-    data_df = data_df.fillna(0)
     data_df['date'] = pd.to_datetime(data_df[['year', 'month']].assign(day=1)).dt.strftime('%Y-%m-%d')
     return data_df
 
@@ -65,7 +61,6 @@ def check_anomalies_same_odpu(df: pd.DataFrame) -> bool:
     iqr = q3 - q1
     df['anom'] = np.where((df['consumption_change_per_day'] > q1 - iqr * 1.5) \
                           & (df['consumption_change_per_day'] < q3 + iqr * 1.5), False, True)
-    # print(df)
     return df.loc[0].anom == 1
 
 
@@ -81,13 +76,14 @@ def check_anomalies_mkd(data: pd.DataFrame):
         'current_consumption_y']) * 100
     df['anom'] = np.where(df['anom'].abs() > 25, True, False)
     df = df.loc[target.index]
+    print(df)
     return df.loc[0].anom == 1
 
 
 def check_anomalies(data: pd.DataFrame):
     msg = ''
     flag = False
-    if datetime(data.iloc[0].year, data.iloc[0].month, 1)\
+    if (datetime(int(data.iloc[0].year), int(data.iloc[0].month), 1))\
             >= datetime.strptime(START_DATE, "%Y-%m-%d"):
         df, target = concat_data(data)
         condition = (df.num_odpu == target.iloc[0].num_odpu)

@@ -101,7 +101,6 @@ def process_file(file):
                 'current_consumption']
             df_ = df_.loc[:, columns_to_keep]
             df_ = df_[df_.hot_water != 'ГВС (централ)']
-            df_ = df_.dropna(subset=['date', 'current_consumption'])  # ?
             df_info = read_csv_file(DATA_OBJECTS_PATH)
             df_ = pd.merge(df_, df_info, how="left", on=['address', 'object_type'])
             df_.date = pd.to_datetime(df_.date)
@@ -116,10 +115,8 @@ def process_file(file):
             df_ = df_.fillna(0)
             for index in df_.index:
                 row_df = df_.loc[[index]]
-                anomaly, reason, consumption = process_data_inputs(row_df)
+                anomaly, reason, _ = process_data_inputs(row_df)
                 if anomaly:
-                    # st.write(row_df)
-                    # st.write(anomaly, reason)
                     df.loc[index, 'anomaly'] = anomaly
             df.to_csv('submit.csv')
             st.write('Ready')
@@ -206,21 +203,22 @@ def process_data_inputs(data: pd.DataFrame) -> tuple:
     """
     anomaly = False
     consumption = None
-
-    temps = transform_df_temps(DATA_TEMP_PATH)
-    df = data.merge(temps, on=['month', 'year'])
-    anomaly_check, reason = check_anomalies(df)
-    if anomaly_check:
-        anomaly = True
-        consumption = df.loc[0].current_consumption
-    else:
-        if (df.loc[0].object_type == 'Многоквартирный дом') \
-                and ('Подобъект' not in df.loc[0].address) \
-                and ('Подъезд' not in df.loc[0].address):
-            if check_anomalies_mkd(df):
-                anomaly = True
-                reason = 'Аномалия в сравнении с похожими домами'
-                consumption = df.loc[0].current_consumption
+    reason = ''
+    if data.iloc[0].month != 0:
+        temps = transform_df_temps(DATA_TEMP_PATH)
+        df = data.merge(temps, on=['month', 'year'])
+        anomaly_check, reason = check_anomalies(df)
+        if anomaly_check:
+            anomaly = True
+            consumption = df.loc[0].current_consumption
+        else:
+            if (df.loc[0].object_type == 'Многоквартирный дом') \
+                    and ('Подобъект' not in df.loc[0].address) \
+                    and ('Подъезд' not in df.loc[0].address):
+                if check_anomalies_mkd(df):
+                    anomaly = True
+                    reason = 'Аномалия в сравнении с похожими домами'
+                    consumption = df.loc[0].current_consumption
     return anomaly, reason, consumption
 
 
